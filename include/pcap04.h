@@ -1295,58 +1295,50 @@ pcap_results_t PCAP04::get_results(){
 
     decimal_part = pcap_results_regs.RES0.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES0.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995F ;
+    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
 
-    decimal_part_num_digits = GET_NUMBER_OF_DIGITS(decimal_part);
     Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.C0_over_CREF = integer_part  + decimal_part_f;
 
     decimal_part = pcap_results_regs.RES1.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES1.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995F ;
-    decimal_part_num_digits = GET_NUMBER_OF_DIGITS(decimal_part);
+    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
     // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.C1_over_CREF = integer_part + decimal_part_f;
 
     decimal_part = pcap_results_regs.RES2.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES2.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995F ;
-    decimal_part_num_digits = GET_NUMBER_OF_DIGITS(decimal_part);
+    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
     // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.C2_over_CREF = integer_part + decimal_part_f;
 
     decimal_part = pcap_results_regs.RES3.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES3.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995F ;
-    decimal_part_num_digits = GET_NUMBER_OF_DIGITS(decimal_part);
+    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
     // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.C3_over_CREF = integer_part + decimal_part_f;
 
     decimal_part = pcap_results_regs.RES4.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES4.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995F ;
-    decimal_part_num_digits = GET_NUMBER_OF_DIGITS(decimal_part);
+    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
     // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.C4_over_CREF = integer_part + decimal_part_f;
 
     decimal_part = pcap_results_regs.RES5.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES5.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995F ;
-    decimal_part_num_digits = GET_NUMBER_OF_DIGITS(decimal_part);
+    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
     // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.C5_over_CREF = integer_part + decimal_part_f;
 
     decimal_part = pcap_results_regs.RES6.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES6.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995F ;
-    decimal_part_num_digits = GET_NUMBER_OF_DIGITS(decimal_part);
+    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
     // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.PT1_over_PTREF = integer_part + decimal_part_f;
 
     decimal_part = pcap_results_regs.RES7.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES7.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995F ;
-    decimal_part_num_digits = GET_NUMBER_OF_DIGITS(decimal_part);
+    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
     Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.PTInternal_over_PTREF = integer_part + decimal_part_f;
 
