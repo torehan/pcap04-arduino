@@ -1199,7 +1199,7 @@ void PCAP04::print_config(){
       Serial.print(*cfg_p, HEX); Serial.print(" ");
     }
     
-    if ((i+1)%16 == 0){
+    if ((i+1)%4 == 0){
       Serial.print(i);
       Serial.println();
     }
@@ -1275,29 +1275,21 @@ pcap_results_t PCAP04::get_results(){
   
   static unsigned int decimal_part = 0;
   static float decimal_part_f = 0;
-
-  static unsigned int decimal_part_num_digits = 0;
-
   static unsigned int integer_part = 0;
 
   readall_result();
 
-  #ifdef PCAP_MEASUREMENT_MODE_STANDARD
+  if (pcap_measurement_mode == STANDARD){
 
     // Serial.println((unsigned int)pcap_results_regs.RES0.REGVAL, HEX);
     // Serial.println((unsigned int)pcap_results_regs.RES0.REGVAL, BIN);
     // Serial.println((unsigned int)(pcap_results_regs.RES0.REGVAL >> 27),BIN);
     // Serial.println((unsigned int)(pcap_results_regs.RES0.REGVAL & 0x07FFFFFF),BIN);
     // Serial.println((unsigned int)(pcap_results_regs.RES0.REGVAL & 0x07FFFFFF));
-
-    
-
-
     decimal_part = pcap_results_regs.RES0.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES0.REGVAL >> 27;
     decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-
-    Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.C0_over_CREF = integer_part  + decimal_part_f;
 
     decimal_part = pcap_results_regs.RES1.REGVAL & 0x07FFFFFF;
@@ -1339,16 +1331,9 @@ pcap_results_t PCAP04::get_results(){
     decimal_part = pcap_results_regs.RES7.REGVAL & 0x07FFFFFF;
     integer_part = pcap_results_regs.RES7.REGVAL >> 27;
     decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-    Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
     pcap_results.PTInternal_over_PTREF = integer_part + decimal_part_f;
-
-  #endif 
-  #ifdef PCAP_MEASUREMENT_MODE_STANDARD_DIFFERENTIAL
-  #endif  
-  #ifdef PCAP_MEASUREMENT_MODE_HUMIDITY
-  #endif  
-  #ifdef PCAP_MEASUREMENT_MODE_PRESSURE
-  #endif
+  }
 
   return pcap_results;
   
