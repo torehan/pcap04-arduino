@@ -179,7 +179,7 @@ struct pcap_config_t
     bool R_FAKE;
     bool R_PORT_EN_IREF;
     bool R_PORT_EN_IMES;
-    unsigned char R_PORT_EN;
+    unsigned char R_PORT_EN : 2;
 
     // unsigned char TDC_MUPU_SPEED:2;      // Mandatory : 3
     // bool TDC_NOISE_DIS:1;                // Mandatory : 0
