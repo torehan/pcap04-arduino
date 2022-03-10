@@ -258,39 +258,42 @@ bool PCAP04::send_command(unsigned char opcode)
 void PCAP04::init_slave()
 {
 
-  initialized = true;
-
   spi_read_test();
 
   delay(100);
 
   send_command(POR_RESET);
   
-  delay(2000);
+  delay(100);
 
   write_config(47,0); // STOP DSP
 
-  delay(1000);
-
-  //read_config(47);
+  delay(100);
 
   readall_nvram();
 
-  Serial.print("RUNBIT:") ;Serial.println(pcap_nvram_mirror.CFG.CFG47.REGVAL,HEX);
+  // Serial.print("RUNBIT: on pcap nvram") ;Serial.println(pcap_nvram_mirror.CFG.CFG47.REGVAL,HEX);
+  // Serial.print("RUNBIT: on teensy nvram") ;Serial.println(pcap_nvram.CFG.CFG47.REGVAL,HEX);  
   
-  delay(1000);
-
   writeall_nvram();
-
-  delay(5000);
-
+  
   validate_nvram();
 
-  delay(5000);
+  // Serial.print("RUNBIT: on pcap nvram valid") ;Serial.println(pcap_nvram_mirror.CFG.CFG47.REGVAL,HEX);  
 
   // send_command(CDC_START);
+
   send_command(INITIALIZE);
+  
+  initialized = true;
+
   delay(1000);
+  
+  Serial.println(); Serial.println("valid config"); Serial.println();
+  
+  print_config();
+
+  Serial.println("pcap initialized");
 
 };
 
@@ -1177,10 +1180,15 @@ void PCAP04::print_nvram(){
 
 void PCAP04::print_config(){
   int s = 0;
+  int offset = 0;
+
   unsigned char* cfg_p = nullptr;
+  uint32_t regval = 0x00;
 
   // Serial.println((long long)&pcap_nvram,HEX);
   // Serial.println((long long)&pcap_nvram.CFG,HEX);
+
+  Serial.println("org ROM_ADD_CFG");
 
   for (uint32_t i = PCAP_NVRAM_MAX_INDEX_FW_CAL1; i < PCAP_NVRAM_SIZE; i++){
     delay(50);
@@ -1189,6 +1197,7 @@ void PCAP04::print_config(){
 
     cfg_p = (unsigned char *)(&pcap_nvram.CFG.CFG0 + s);
 
+    regval = regval | *cfg_p << 8*offset;
     // Serial.print("i, s :");Serial.print(i);Serial.print(", ");Serial.println(s);
     // Serial.print("&pcap_nvram.CFG.CFG0 + s:");Serial.println((long long)(&pcap_nvram.CFG.CFG0 + s),HEX);
 
@@ -1198,10 +1207,20 @@ void PCAP04::print_config(){
     else{
       Serial.print(*cfg_p, HEX); Serial.print(" ");
     }
-    
+    offset++;
     if ((i+1)%4 == 0){
+      Serial.print("equal4 ");
+      char tmp[16];
+      char format[128];
+      sprintf(format, "0x%%.%dX", 8);
+      sprintf(tmp, format, regval);
+      Serial.print(tmp);
+      Serial.print(" ");
+      //Serial.print(regval,HEX);
       Serial.print(i);
       Serial.println();
+      offset = 0;
+      regval = 0;
     }
   }
 }
@@ -1384,13 +1403,6 @@ void PCAP04::validate_nvram(){
   static unsigned char* nvram_mirror_p;
 
   readall_nvram();
-
-  Serial.print(sizeof(__PCAP_NVRAM_T)); Serial.print(" ");
-  Serial.print(sizeof(__PCAP_CONFIG_REGS_T)); Serial.print(" ");
-  Serial.print(sizeof(__PCAP_FW_T)); Serial.println(" ");
-
-  Serial.print("(&pcap_nvram)"); Serial.println((long long)(&pcap_nvram),HEX);
-  Serial.print("(&pcap_nvram.FW)"); Serial.println((long long)(&pcap_nvram.FW),HEX);
 
   nvram_p = &pcap_nvram.FW.data[0];
   nvram_mirror_p = &pcap_nvram_mirror.FW.data[0];
