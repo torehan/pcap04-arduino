@@ -17,6 +17,7 @@ public:
   
   PCAP04(pcap04_version_t version, pcap_serial_interface_t pcap_sif_mode, 
                 pcap_measurement_modes_t measurement_mode, char device_specifier, 
+<<<<<<< HEAD
                 pcap_config_t config); // f_clock:1 MHz, CPOL:0, CPHA:1, MSB First
 
   // method to initialize pcap04 as slave
@@ -25,6 +26,16 @@ public:
   bool test_connection(void);
 
   void init_nvram(void);
+=======
+                pcap_config_handler_t config_handler, pcap_config_t config); // f_clock:1 MHz, CPOL:0, CPHA:1, MSB First
+
+  // method to initalize pcap04 as slave
+  void initalize(void);
+
+  bool test_connection(void);
+
+  pcap_config_handler_t init_nvram(void);
+>>>>>>> f7b3a4d972c2f6995da809daa757d51c55a51844
 
   // serial print nvram as 16x64 hex array. e.g. 22 8A A0 01 .. .. ..
   void print_nvram(void);
@@ -44,7 +55,11 @@ public:
 
   void reset_pcap_dsp(void);
 
+<<<<<<< HEAD
   volatile bool cdc_complete_flag = false;
+=======
+  volatile bool cdc_complete_flag;
+>>>>>>> f7b3a4d972c2f6995da809daa757d51c55a51844
   
 private:
 
@@ -96,6 +111,11 @@ private:
   pcap_opcode_command_t nv_erase = {.command = {.op_code = NV_ERASE}};
   pcap_opcode_testread_t test_read = {.testread = {.fixed = TEST_READ_LOW, .op_code = TEST_READ_HIGH}};
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> f7b3a4d972c2f6995da809daa757d51c55a51844
   virtual unsigned char spi_transmit(unsigned char data);
   virtual unsigned char spi_transmit(unsigned short data);
   virtual unsigned char spi_transmit(unsigned int data);
@@ -125,7 +145,11 @@ private:
 
 PCAP04::PCAP04(pcap04_version_t version, pcap_serial_interface_t pcap_sif_mode, 
               pcap_measurement_modes_t measurement_mode, char device_specifier, 
+<<<<<<< HEAD
               pcap_config_t config)
+=======
+              pcap_config_handler_t config_handler, pcap_config_t config)
+>>>>>>> f7b3a4d972c2f6995da809daa757d51c55a51844
 {
   sif_mode = pcap_sif_mode;
 
@@ -268,7 +292,11 @@ bool PCAP04::send_command(unsigned char opcode)
   return true;
 }
 
+<<<<<<< HEAD
 void PCAP04::initialize()
+=======
+void PCAP04::initalize()
+>>>>>>> f7b3a4d972c2f6995da809daa757d51c55a51844
 {
 
   delay(100);
@@ -292,9 +320,15 @@ void PCAP04::initialize()
 
   // Serial.print("RUNBIT: on pcap nvram valid") ;Serial.println(pcap_nvram_mirror.CFG.CFG47.REGVAL,HEX);  
 
+<<<<<<< HEAD
   send_command(INITIALIZE_OP);
 
   // send_command(CDC_START);
+=======
+  send_command(INITIALIZE);
+
+  send_command(CDC_START);
+>>>>>>> f7b3a4d972c2f6995da809daa757d51c55a51844
  
   initialized = true;
 
