@@ -12,7 +12,7 @@
 #define RD_CONFIG 0x008F    // 'b:00 1000 1111
 #define RD_RESULT 0x01      // 'b:01
 #define POR_RESET 0x88      // 'b:1000 1000
-#define INITIALIZE 0x8A     // 'b:1000 1010
+#define INITIALIZE_OP 0x8A     // 'b:1000 1010
 #define CDC_START 0x8C      // 'b:1000 1100
 #define RDC_START 0x8E      // 'b:1000 1110
 #define DSP_TRIG 0x8D       // 'b:1000 1101
