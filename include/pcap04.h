@@ -44,6 +44,10 @@ public:
 
   void reset_pcap_dsp(void);
 
+  void start_sampling(pcap_config_t* config);
+
+  void stop_sampling(pcap_config_t* config);
+
   volatile bool cdc_complete_flag = false;
   
 private:
@@ -117,7 +121,11 @@ private:
   virtual void readall_result(void);
   virtual void read_result(unsigned char addr);
 
+  virtual void convert_results_regs_to_float();
+
   virtual void readall_status(void);
+
+  virtual void convert_status_regs_to_flags();
 
   virtual void validate_nvram(void);
 
@@ -307,6 +315,22 @@ void PCAP04::initialize()
   Serial.println("pcap initialized");
 
 };
+
+void PCAP04::start_sampling(pcap_config_t* config){
+  
+  config->RUNBIT = 1;
+
+  write_config(47, config->RUNBIT);
+
+}
+
+void PCAP04::stop_sampling(pcap_config_t* config){
+  
+  config->RUNBIT = 0;
+
+  write_config(47, config->RUNBIT);
+
+}
 
 void PCAP04::writeall_config()
 {
@@ -696,7 +720,7 @@ void PCAP04::readall_status()
 
 //  Serial.println("readall_result start");
 
-  for (size_t addr = PCAP_RESULTS_SIZE-3; addr < PCAP_RESULTS_SIZE; addr++)
+  for (size_t addr = PCAP_RESULTS_SIZE; addr < PCAP_RESULTS_SIZE + PCAP_STATUS_SIZE; addr++)
   {
     read_result(addr);
   }
@@ -718,7 +742,7 @@ void PCAP04::read_result(unsigned char addr)
 
   SPI.beginTransaction(pcap_spi_settings);
 
-  if ((addr >= 0) && (addr < PCAP_RESULTS_SIZE))
+  if ((addr >= 0) && (addr < PCAP_RESULTS_SIZE + PCAP_STATUS_SIZE))
   {
     rd_result.result.addr = addr;
     rd_result.result.data = 0;
@@ -826,147 +850,215 @@ void PCAP04::read_result(unsigned char addr)
   SPI.endTransaction();
   // Serial.println("read_result end");
 }
+void PCAP04::convert_status_regs_to_flags(){
+  pcap_status.RUNBIT =  pcap_results_regs.STATUS0.STATUS0.RUNBIT;
+  pcap_status.CDC_ACTIVE =  pcap_results_regs.STATUS0.STATUS0.CDC_ACTIVE;
+  pcap_status.RDC_READY =  pcap_results_regs.STATUS0.STATUS0.RDC_READY;
+  pcap_status.AUTOBOOT_BUSY = pcap_results_regs.STATUS0.STATUS0.AUTOBOOT_BUSY;
+  pcap_status.POR_CDC_DSP_COLL =  pcap_results_regs.STATUS0.STATUS0.POR_CDC_DSP_COLL;
+  pcap_status.POR_FLAG_WDOG = pcap_results_regs.STATUS0.STATUS0.POR_FLAG_WDOG;
 
-void PCAP04::update_config(pcap_config_t* pcap_config)
+  pcap_status.COMB_ERR = pcap_results_regs.STATUS1.STATUS1.COMB_ERR;
+  pcap_status.ERR_OVERFL = pcap_results_regs.STATUS1.STATUS1.ERR_OVFL;
+  pcap_status.MUP_ERR = pcap_results_regs.STATUS1.STATUS1.MUP_ERR;
+  pcap_status.RDC_ERR = pcap_results_regs.STATUS1.STATUS1.RDC_ERR;
+
+  pcap_status.C_PORT_ERR0 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR0;
+  pcap_status.C_PORT_ERR1 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR1;
+  pcap_status.C_PORT_ERR2 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR2;
+  pcap_status.C_PORT_ERR3 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR3;
+  pcap_status.C_PORT_ERR4 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR4;
+  pcap_status.C_PORT_ERR5 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR5;
+  pcap_status.C_PORT_ERR_INT = pcap_results_regs.STATUS2.STATUS2.C_PORTERR_INT;
+}
+
+void PCAP04::convert_results_regs_to_float(){
+
+  int ireg = 0;
+  int regoffset = PCAP_RESULT_REG_SIZE;
+
+  static unsigned int regval = 0;
+
+  static unsigned int decimal_part = 0;
+  static float decimal_part_f = 0;
+  static unsigned int integer_part = 0;
+  
+  // Serial.print("&pcap_results:");Serial.println((int)&pcap_results);
+  // Serial.print("&pcap_results.CREF_over_CInternalREF:");Serial.println((int)&pcap_results.CREF_over_CInternalREF);
+  // Serial.print("&pcap_results.C1_over_CREF:");Serial.println((int)&pcap_results.C1_over_CREF);
+  // Serial.print("&pcap_results.C2_over_CREF:");Serial.println((int)&pcap_results.C2_over_CREF); 
+  // Serial.print("&pcap_results.PTInternal_over_PTREF:");Serial.println((int)&pcap_results.PTInternal_over_PTREF);  
+  // Serial.print("&pcap_results.PT1_over_PTREF:");Serial.println((int)&pcap_results.PT1_over_PTREF);
+  // Serial.print("regval:");Serial.println(regval);
+  // Serial.print("pcap_config.C_FLOATING:");Serial.println(pcap_config.C_FLOATING);
+  // Serial.print("pcap_config.C_DIFFERENTIAL:");Serial.println(pcap_config.C_DIFFERENTIAL);
+  // Serial.print("pcap_measurement_mode:");Serial.println(pcap_measurement_mode);
+
+  for(ireg = 0; ireg < PCAP_RESULTS_SIZE/regoffset; ireg++){
+    regval = *(&pcap_results_regs.RES0.REGVAL + ireg);
+    // Serial.print("REGVAL:");Serial.print((int)(&pcap_results_regs.RES0.REGVAL + ireg));Serial.print(" - ");
+    // Serial.print((int)(&pcap_results)+ireg*regoffset);Serial.print(" - ");    
+    // Serial.print("regval:");Serial.print(regval);
+
+    decimal_part = regval & 0x07FFFFFF;
+    integer_part = regval >> 27;
+    decimal_part_f =  integer_part + (float)(decimal_part/134217727.0f)*0.9999995f;
+    // Serial.print(" - "); Serial.print("decimal:");Serial.print(decimal_part_f);
+
+    if ((pcap_measurement_mode == STANDARD) && 
+        (pcap_config.C_FLOATING || pcap_config.C_DIFFERENTIAL) && 
+        (ireg>5)){
+          memcpy((void*)((int)(&pcap_results) + (ireg-3)*regoffset), &decimal_part_f, regoffset);
+          // Serial.print("ireg>5:");Serial.print(ireg);Serial.print(" - ");Serial.print((int)(&pcap_results) + (ireg-3)*regoffset);Serial.print(" - ");
+    }else {
+      memcpy((void*)((int)(&pcap_results) + ireg*regoffset), &decimal_part_f, regoffset);
+      // Serial.print("ireg:");Serial.print(ireg);Serial.print(" - ");Serial.print((int)(&pcap_results) + ireg*regoffset);Serial.print(" - ");
+    }
+    // Serial.println();
+  }
+}
+
+void PCAP04::update_config(pcap_config_t* config)
 {
 
-  pcap_nvram.CFG.CFG0.CFG0.I2C_A = pcap_config->I2C_A;
+  pcap_config = *config;
+  pcap_nvram.CFG.CFG0.CFG0.I2C_A = config->I2C_A;
   
-  pcap_nvram.CFG.CFG0.CFG0.OLF_CTUNE = pcap_config->OLF_CTUNE;
-  pcap_nvram.CFG.CFG0.CFG0.OLF_FTUNE = pcap_config->OLF_FTUNE;
+  pcap_nvram.CFG.CFG0.CFG0.OLF_CTUNE = config->OLF_CTUNE;
+  pcap_nvram.CFG.CFG0.CFG0.OLF_FTUNE = config->OLF_FTUNE;
 
-  pcap_nvram.CFG.CFG1.CFG1.OX_DIS = pcap_config->OX_DIS;
-  pcap_nvram.CFG.CFG1.CFG1.OX_DIV4 = pcap_config->OX_DIV4;
+  pcap_nvram.CFG.CFG1.CFG1.OX_DIS = config->OX_DIS;
+  pcap_nvram.CFG.CFG1.CFG1.OX_DIV4 = config->OX_DIV4;
   //pcap_nvram.CFG.CFG1.CFG1.OX_AUTOSTOP_DIS = 0;
   //pcap_nvram.CFG.CFG1.CFG1.OX_STOP = 0;
-  pcap_nvram.CFG.CFG1.CFG1.OX_RUN = pcap_config->OX_RUN;
+  pcap_nvram.CFG.CFG1.CFG1.OX_RUN = config->OX_RUN;
 
-  pcap_nvram.CFG.CFG2.CFG2.RDCHG_INT_SEL0 = pcap_config->RDCHG_INT_SEL0;
-  pcap_nvram.CFG.CFG2.CFG2.RDCHG_INT_SEL1 = pcap_config->RDCHG_INT_SEL1;
-  pcap_nvram.CFG.CFG2.CFG2.RDCHG_INT_EN = pcap_config->RDCHG_INT_EN;
-  pcap_nvram.CFG.CFG2.CFG2.RDCHG_EXT_EN = pcap_config->RDCHG_EXT_EN;
+  pcap_nvram.CFG.CFG2.CFG2.RDCHG_INT_SEL0 = config->RDCHG_INT_SEL0;
+  pcap_nvram.CFG.CFG2.CFG2.RDCHG_INT_SEL1 = config->RDCHG_INT_SEL1;
+  pcap_nvram.CFG.CFG2.CFG2.RDCHG_INT_EN = config->RDCHG_INT_EN;
+  pcap_nvram.CFG.CFG2.CFG2.RDCHG_EXT_EN = config->RDCHG_EXT_EN;
 
-  pcap_nvram.CFG.CFG3.CFG3.AUX_PD_DIS = pcap_config->AUX_PD_DIS;
-  pcap_nvram.CFG.CFG3.CFG3.AUX_CINT = pcap_config->AUX_CINT;
-  pcap_nvram.CFG.CFG3.CFG3.RDCHG_OPEN = pcap_config->RDCHG_OPEN;
-  pcap_nvram.CFG.CFG3.CFG3.RDCHG_PERM_EN = pcap_config->RDCHG_PERM_EN;
-  pcap_nvram.CFG.CFG3.CFG3.RDCHG_EXT_PERM = pcap_config->RDCHG_EXT_PERM;
-  pcap_nvram.CFG.CFG3.CFG3.RCHG_SEL = pcap_config->RCHG_SEL;
+  pcap_nvram.CFG.CFG3.CFG3.AUX_PD_DIS = config->AUX_PD_DIS;
+  pcap_nvram.CFG.CFG3.CFG3.AUX_CINT = config->AUX_CINT;
+  pcap_nvram.CFG.CFG3.CFG3.RDCHG_OPEN = config->RDCHG_OPEN;
+  pcap_nvram.CFG.CFG3.CFG3.RDCHG_PERM_EN = config->RDCHG_PERM_EN;
+  pcap_nvram.CFG.CFG3.CFG3.RDCHG_EXT_PERM = config->RDCHG_EXT_PERM;
+  pcap_nvram.CFG.CFG3.CFG3.RCHG_SEL = config->RCHG_SEL;
 
-  pcap_nvram.CFG.CFG4.CFG4.C_REF_INT = pcap_config->C_REF_INT;
-  pcap_nvram.CFG.CFG4.CFG4.C_COMP_EXT = pcap_config->C_COMP_EXT;
-  pcap_nvram.CFG.CFG4.CFG4.C_COMP_INT = pcap_config->C_COMP_INT;
-  pcap_nvram.CFG.CFG4.CFG4.C_DIFFERENTIAL = pcap_config->C_DIFFERENTIAL;
-  pcap_nvram.CFG.CFG4.CFG4.C_FLOATING = pcap_config->C_FLOATING;
+  pcap_nvram.CFG.CFG4.CFG4.C_REF_INT = config->C_REF_INT;
+  pcap_nvram.CFG.CFG4.CFG4.C_COMP_EXT = config->C_COMP_EXT;
+  pcap_nvram.CFG.CFG4.CFG4.C_COMP_INT = config->C_COMP_INT;
+  pcap_nvram.CFG.CFG4.CFG4.C_DIFFERENTIAL = config->C_DIFFERENTIAL;
+  pcap_nvram.CFG.CFG4.CFG4.C_FLOATING = config->C_FLOATING;
 
-  pcap_nvram.CFG.CFG5.CFG5.CY_PRE_MR1_SHORT = pcap_config->CY_PRE_MR1_SHORT;
-  pcap_nvram.CFG.CFG5.CFG5.C_PORT_PAT = pcap_config->C_PORT_PAT;
-  pcap_nvram.CFG.CFG5.CFG5.CY_HFCLK_SEL = pcap_config->CY_HFCLK_SEL;
-  pcap_nvram.CFG.CFG5.CFG5.CY_DIV4_DIS = pcap_config->CY_DIV4_DIS;
-  pcap_nvram.CFG.CFG5.CFG5.CY_PRE_LONG = pcap_config->CY_PRE_LONG;
-  pcap_nvram.CFG.CFG5.CFG5.C_DC_BALANCE = pcap_config->C_DC_BALANCE;
+  pcap_nvram.CFG.CFG5.CFG5.CY_PRE_MR1_SHORT = config->CY_PRE_MR1_SHORT;
+  pcap_nvram.CFG.CFG5.CFG5.C_PORT_PAT = config->C_PORT_PAT;
+  pcap_nvram.CFG.CFG5.CFG5.CY_HFCLK_SEL = config->CY_HFCLK_SEL;
+  pcap_nvram.CFG.CFG5.CFG5.CY_DIV4_DIS = config->CY_DIV4_DIS;
+  pcap_nvram.CFG.CFG5.CFG5.CY_PRE_LONG = config->CY_PRE_LONG;
+  pcap_nvram.CFG.CFG5.CFG5.C_DC_BALANCE = config->C_DC_BALANCE;
 
-  pcap_nvram.CFG.CFG6.CFG6.C_PORT_EN = pcap_config->C_PORT_EN;
+  pcap_nvram.CFG.CFG6.CFG6.C_PORT_EN = config->C_PORT_EN;
 
-  pcap_nvram.CFG.CFG7.CFG7.C_AVRG_LOW = pcap_config->C_AVRG & 0xFF;
-  pcap_nvram.CFG.CFG8.CFG8.C_AVRG_HIGH = (pcap_config->C_AVRG >> 8) & 0x1F;
+  pcap_nvram.CFG.CFG7.CFG7.C_AVRG_LOW = config->C_AVRG & 0xFF;
+  pcap_nvram.CFG.CFG8.CFG8.C_AVRG_HIGH = (config->C_AVRG >> 8) & 0x1F;
 
-  pcap_nvram.CFG.CFG9.CFG9.CONV_TIME_LOW = pcap_config->CONV_TIME & 0xFF;
-  pcap_nvram.CFG.CFG10.CFG10.CONV_TIME_MID = (pcap_config->CONV_TIME >> 8) & 0xFF;
-  pcap_nvram.CFG.CFG11.CFG11.CONV_TIME_HIGH = (pcap_config->CONV_TIME >> 16) & 0x7F;
+  pcap_nvram.CFG.CFG9.CFG9.CONV_TIME_LOW = config->CONV_TIME & 0xFF;
+  pcap_nvram.CFG.CFG10.CFG10.CONV_TIME_MID = (config->CONV_TIME >> 8) & 0xFF;
+  pcap_nvram.CFG.CFG11.CFG11.CONV_TIME_HIGH = (config->CONV_TIME >> 16) & 0x7F;
 
-  pcap_nvram.CFG.CFG12.CFG12.DISCHARGE_TIME_LOW = pcap_config->DISCHARGE_TIME & 0xFF;
-  pcap_nvram.CFG.CFG13.CFG13.DISCHARGE_TIME_HIGH = (pcap_config->DISCHARGE_TIME >> 8) & 0x03;
-  pcap_nvram.CFG.CFG13.CFG13.C_STARTONPIN = pcap_config->C_STARTONPIN;
-  pcap_nvram.CFG.CFG13.CFG13.C_TRIG_SEL = pcap_config->C_TRIG_SEL;
+  pcap_nvram.CFG.CFG12.CFG12.DISCHARGE_TIME_LOW = config->DISCHARGE_TIME & 0xFF;
+  pcap_nvram.CFG.CFG13.CFG13.DISCHARGE_TIME_HIGH = (config->DISCHARGE_TIME >> 8) & 0x03;
+  pcap_nvram.CFG.CFG13.CFG13.C_STARTONPIN = config->C_STARTONPIN;
+  pcap_nvram.CFG.CFG13.CFG13.C_TRIG_SEL = config->C_TRIG_SEL;
 
-  pcap_nvram.CFG.CFG14.CFG14.PRECHARGE_TIME_LOW = pcap_config->PRECHARGE_TIME & 0xFF;
-  pcap_nvram.CFG.CFG15.CFG15.PRECHARGE_TIME_HIGH = (pcap_config->PRECHARGE_TIME >> 8) & 0x03;
-  pcap_nvram.CFG.CFG15.CFG15.C_FAKE = pcap_config->C_FAKE;
+  pcap_nvram.CFG.CFG14.CFG14.PRECHARGE_TIME_LOW = config->PRECHARGE_TIME & 0xFF;
+  pcap_nvram.CFG.CFG15.CFG15.PRECHARGE_TIME_HIGH = (config->PRECHARGE_TIME >> 8) & 0x03;
+  pcap_nvram.CFG.CFG15.CFG15.C_FAKE = config->C_FAKE;
 
-  pcap_nvram.CFG.CFG16.CFG16.FULLCHARGE_TIME_LOW = pcap_config->FULLCHARGE_TIME & 0xFF;
-  pcap_nvram.CFG.CFG17.CFG17.FULLCHARGE_TIME_HIGH = (pcap_config->FULLCHARGE_TIME >> 8) & 0x03;
-  pcap_nvram.CFG.CFG17.CFG17.C_REF_SEL = pcap_config->C_REF_SEL;
+  pcap_nvram.CFG.CFG16.CFG16.FULLCHARGE_TIME_LOW = config->FULLCHARGE_TIME & 0xFF;
+  pcap_nvram.CFG.CFG17.CFG17.FULLCHARGE_TIME_HIGH = (config->FULLCHARGE_TIME >> 8) & 0x03;
+  pcap_nvram.CFG.CFG17.CFG17.C_REF_SEL = config->C_REF_SEL;
 
-  pcap_nvram.CFG.CFG18.CFG18.C_G_OP_RUN = pcap_config->C_G_OP_RUN;
-  pcap_nvram.CFG.CFG18.CFG18.C_G_OP_EXT = pcap_config->C_G_OP_EXT;
-  pcap_nvram.CFG.CFG18.CFG18.C_G_EN = pcap_config->C_G_EN;
+  pcap_nvram.CFG.CFG18.CFG18.C_G_OP_RUN = config->C_G_OP_RUN;
+  pcap_nvram.CFG.CFG18.CFG18.C_G_OP_EXT = config->C_G_OP_EXT;
+  pcap_nvram.CFG.CFG18.CFG18.C_G_EN = config->C_G_EN;
 
-  pcap_nvram.CFG.CFG19.CFG19.C_G_OP_VU = pcap_config->C_G_OP_VU;
-  pcap_nvram.CFG.CFG19.CFG19.C_G_OP_ATTN = pcap_config->C_G_OP_ATTN;
-  pcap_nvram.CFG.CFG19.CFG19.C_G_TIME = pcap_config->C_G_TIME;
+  pcap_nvram.CFG.CFG19.CFG19.C_G_OP_VU = config->C_G_OP_VU;
+  pcap_nvram.CFG.CFG19.CFG19.C_G_OP_ATTN = config->C_G_OP_ATTN;
+  pcap_nvram.CFG.CFG19.CFG19.C_G_TIME = config->C_G_TIME;
 
-  pcap_nvram.CFG.CFG20.CFG20.R_CY = pcap_config->R_CY;
-  pcap_nvram.CFG.CFG20.CFG20.C_G_OP_TR = pcap_config->C_G_OP_TR;
+  pcap_nvram.CFG.CFG20.CFG20.R_CY = config->R_CY;
+  pcap_nvram.CFG.CFG20.CFG20.C_G_OP_TR = config->C_G_OP_TR;
 
-  pcap_nvram.CFG.CFG21.CFG21.R_TRIG_PREDIV_LOW = pcap_config->R_TRIG_PREDIV & 0xFF;
-  pcap_nvram.CFG.CFG22.CFG22.R_TRIG_PREDIV_HIGH = (pcap_config->R_TRIG_PREDIV >> 8) & 0xFF;
-  pcap_nvram.CFG.CFG22.CFG22.R_TRIG_SEL = pcap_config->R_TRIG_SEL;
-  pcap_nvram.CFG.CFG22.CFG22.R_AVRG = pcap_config->R_AVRG;
+  pcap_nvram.CFG.CFG21.CFG21.R_TRIG_PREDIV_LOW = config->R_TRIG_PREDIV & 0xFF;
+  pcap_nvram.CFG.CFG22.CFG22.R_TRIG_PREDIV_HIGH = (config->R_TRIG_PREDIV >> 8) & 0xFF;
+  pcap_nvram.CFG.CFG22.CFG22.R_TRIG_SEL = config->R_TRIG_SEL;
+  pcap_nvram.CFG.CFG22.CFG22.R_AVRG = config->R_AVRG;
 
-  pcap_nvram.CFG.CFG23.CFG23.R_PORT_EN = pcap_config->R_PORT_EN;
-  pcap_nvram.CFG.CFG23.CFG23.R_PORT_EN_IMES = pcap_config->R_PORT_EN_IMES;
-  pcap_nvram.CFG.CFG23.CFG23.R_PORT_EN_IREF = pcap_config->R_PORT_EN_IREF;
-  pcap_nvram.CFG.CFG23.CFG23.R_FAKE = pcap_config->R_FAKE;
-  pcap_nvram.CFG.CFG23.CFG23.R_STARTONPIN = pcap_config->R_STARTONPIN;
+  pcap_nvram.CFG.CFG23.CFG23.R_PORT_EN = config->R_PORT_EN;
+  pcap_nvram.CFG.CFG23.CFG23.R_PORT_EN_IMES = config->R_PORT_EN_IMES;
+  pcap_nvram.CFG.CFG23.CFG23.R_PORT_EN_IREF = config->R_PORT_EN_IREF;
+  pcap_nvram.CFG.CFG23.CFG23.R_FAKE = config->R_FAKE;
+  pcap_nvram.CFG.CFG23.CFG23.R_STARTONPIN = config->R_STARTONPIN;
 
-  pcap_nvram.CFG.CFG27.CFG27.DSP_MOFLO_EN = pcap_config->DSP_MOFLO_EN;
-  pcap_nvram.CFG.CFG27.CFG27.DSP_SPEED = pcap_config->DSP_SPEED;
-  pcap_nvram.CFG.CFG27.CFG27.PG0xPG2 = pcap_config->PG0xPG2;
-  pcap_nvram.CFG.CFG27.CFG27.PG1xPG3 = pcap_config->PG1xPG3;
+  pcap_nvram.CFG.CFG27.CFG27.DSP_MOFLO_EN = config->DSP_MOFLO_EN;
+  pcap_nvram.CFG.CFG27.CFG27.DSP_SPEED = config->DSP_SPEED;
+  pcap_nvram.CFG.CFG27.CFG27.PG0xPG2 = config->PG0xPG2;
+  pcap_nvram.CFG.CFG27.CFG27.PG1xPG3 = config->PG1xPG3;
 
-  pcap_nvram.CFG.CFG28.CFG28.WD_DIS = pcap_config->WD_DIS;
+  pcap_nvram.CFG.CFG28.CFG28.WD_DIS = config->WD_DIS;
 
-  pcap_nvram.CFG.CFG29.CFG29.DSP_STARTONPIN = pcap_config->DSP_STARTONPIN;
-  pcap_nvram.CFG.CFG29.CFG29.DSP_FF_IN = pcap_config->DSP_FF_IN;
+  pcap_nvram.CFG.CFG29.CFG29.DSP_STARTONPIN = config->DSP_STARTONPIN;
+  pcap_nvram.CFG.CFG29.CFG29.DSP_FF_IN = config->DSP_FF_IN;
 
-  pcap_nvram.CFG.CFG30.CFG30.PG5_INTN_EN = pcap_config->PG5_INTN_EN;
-  pcap_nvram.CFG.CFG30.CFG30.PG4_INTN_EN = pcap_config->PG4_INTN_EN;
-  pcap_nvram.CFG.CFG30.CFG30.DSP_START_EN = pcap_config->DSP_START_EN;
+  pcap_nvram.CFG.CFG30.CFG30.PG5_INTN_EN = config->PG5_INTN_EN;
+  pcap_nvram.CFG.CFG30.CFG30.PG4_INTN_EN = config->PG4_INTN_EN;
+  pcap_nvram.CFG.CFG30.CFG30.DSP_START_EN = config->DSP_START_EN;
 
-  pcap_nvram.CFG.CFG31.CFG31.PI1_TOGGLE_EN = pcap_config->PI1_TOGGLE_EN;
-  pcap_nvram.CFG.CFG31.CFG31.PI0_TOGGLE_EN = pcap_config->PI0_TOGGLE_EN;
-  pcap_nvram.CFG.CFG31.CFG31.PI0_RES = pcap_config->PI0_RES;
-  pcap_nvram.CFG.CFG31.CFG31.PI0_PDM_SEL = pcap_config->PI0_PDM_SEL;
-  pcap_nvram.CFG.CFG31.CFG31.PI0_CLK_SEL = pcap_config->PI0_CLK_SEL;
+  pcap_nvram.CFG.CFG31.CFG31.PI1_TOGGLE_EN = config->PI1_TOGGLE_EN;
+  pcap_nvram.CFG.CFG31.CFG31.PI0_TOGGLE_EN = config->PI0_TOGGLE_EN;
+  pcap_nvram.CFG.CFG31.CFG31.PI0_RES = config->PI0_RES;
+  pcap_nvram.CFG.CFG31.CFG31.PI0_PDM_SEL = config->PI0_PDM_SEL;
+  pcap_nvram.CFG.CFG31.CFG31.PI0_CLK_SEL = config->PI0_CLK_SEL;
 
-  pcap_nvram.CFG.CFG32.CFG32.PI1_RES = pcap_config->PI1_RES;
-  pcap_nvram.CFG.CFG32.CFG32.PI1_PDM_SEL = pcap_config->PI1_PDM_SEL;
-  pcap_nvram.CFG.CFG32.CFG32.PI1_CLK_SEL = pcap_config->PI1_CLK_SEL;
+  pcap_nvram.CFG.CFG32.CFG32.PI1_RES = config->PI1_RES;
+  pcap_nvram.CFG.CFG32.CFG32.PI1_PDM_SEL = config->PI1_PDM_SEL;
+  pcap_nvram.CFG.CFG32.CFG32.PI1_CLK_SEL = config->PI1_CLK_SEL;
 
-  pcap_nvram.CFG.CFG33.CFG33.PG_DIR_IN = pcap_config->PG_DIR_IN;
-  pcap_nvram.CFG.CFG33.CFG33.PG_PU = pcap_config->PG_PU;
+  pcap_nvram.CFG.CFG33.CFG33.PG_DIR_IN = config->PG_DIR_IN;
+  pcap_nvram.CFG.CFG33.CFG33.PG_PU = config->PG_PU;
 
-  pcap_nvram.CFG.CFG34.CFG34.INT_TRIG_BG = pcap_config->INT_TRIG_BG;
-  pcap_nvram.CFG.CFG34.CFG34.DSP_TRIG_BG = pcap_config->DSP_TRIG_BG;
-  pcap_nvram.CFG.CFG34.CFG34.BG_PERM = pcap_config->BG_PERM;
-  pcap_nvram.CFG.CFG34.CFG34.AUTOSTART = pcap_config->AUTOSTART;
+  pcap_nvram.CFG.CFG34.CFG34.INT_TRIG_BG = config->INT_TRIG_BG;
+  pcap_nvram.CFG.CFG34.CFG34.DSP_TRIG_BG = config->DSP_TRIG_BG;
+  pcap_nvram.CFG.CFG34.CFG34.BG_PERM = config->BG_PERM;
+  pcap_nvram.CFG.CFG34.CFG34.AUTOSTART = config->AUTOSTART;
 
-  pcap_nvram.CFG.CFG35.CFG35.CDC_GAIN_CORR = pcap_config->CDC_GAIN_CORR;
-  pcap_nvram.CFG.CFG38.CFG38.BG_TIME = pcap_config->BG_TIME;
+  pcap_nvram.CFG.CFG35.CFG35.CDC_GAIN_CORR = config->CDC_GAIN_CORR;
+  pcap_nvram.CFG.CFG38.CFG38.BG_TIME = config->BG_TIME;
 
-  pcap_nvram.CFG.CFG39.CFG39.PULSE_SEL0 = pcap_config->PULSE_SEL0;
-  pcap_nvram.CFG.CFG39.CFG39.PULSE_SEL1 = pcap_config->PULSE_SEL1;
+  pcap_nvram.CFG.CFG39.CFG39.PULSE_SEL0 = config->PULSE_SEL0;
+  pcap_nvram.CFG.CFG39.CFG39.PULSE_SEL1 = config->PULSE_SEL1;
 
-  pcap_nvram.CFG.CFG40.CFG40.C_SENSE_SEL = pcap_config->C_SENSE_SEL;
+  pcap_nvram.CFG.CFG40.CFG40.C_SENSE_SEL = config->C_SENSE_SEL;
 
-  pcap_nvram.CFG.CFG41.CFG41.R_SENSE_SEL = pcap_config->R_SENSE_SEL;
+  pcap_nvram.CFG.CFG41.CFG41.R_SENSE_SEL = config->R_SENSE_SEL;
 
-  pcap_nvram.CFG.CFG42.CFG42.ALARM1_SELECT = pcap_config->ALARM1_SELECT;
-  pcap_nvram.CFG.CFG42.CFG42.ALARM0_SELECT = pcap_config->ALARM0_SELECT;
-  pcap_nvram.CFG.CFG42.CFG42.EN_ASYNC_READ = pcap_config->EN_ASYNC_READ;
-  pcap_nvram.CFG.CFG42.CFG42.HS_MODE_SEL = pcap_config->HS_MODE_SEL;
-  pcap_nvram.CFG.CFG42.CFG42.R_MEDIAN_EN = pcap_config->R_MEDIAN_EN;
-  pcap_nvram.CFG.CFG42.CFG42.C_MEDIAN_EN = pcap_config->C_MEDIAN_EN;
+  pcap_nvram.CFG.CFG42.CFG42.ALARM1_SELECT = config->ALARM1_SELECT;
+  pcap_nvram.CFG.CFG42.CFG42.ALARM0_SELECT = config->ALARM0_SELECT;
+  pcap_nvram.CFG.CFG42.CFG42.EN_ASYNC_READ = config->EN_ASYNC_READ;
+  pcap_nvram.CFG.CFG42.CFG42.HS_MODE_SEL = config->HS_MODE_SEL;
+  pcap_nvram.CFG.CFG42.CFG42.R_MEDIAN_EN = config->R_MEDIAN_EN;
+  pcap_nvram.CFG.CFG42.CFG42.C_MEDIAN_EN = config->C_MEDIAN_EN;
 
-  pcap_nvram.CFG.CFG47.CFG47.RUNBIT = pcap_config->RUNBIT;
+  pcap_nvram.CFG.CFG47.CFG47.RUNBIT = config->RUNBIT;
 
-  pcap_nvram.CFG.CFG48.CFG48.MEM_LOCK = pcap_config->MEM_LOCK;
+  pcap_nvram.CFG.CFG48.CFG48.MEM_LOCK = config->MEM_LOCK;
 
-  pcap_nvram.CFG.CFG49.CFG49.SERIAL_NUMBER_LOW = pcap_config->SERIAL_NUMBER & 0xFF;
-  pcap_nvram.CFG.CFG50.CFG50.SERIAL_NUMBER_HIGH = (pcap_config->SERIAL_NUMBER >> 8) & 0xFF;
+  pcap_nvram.CFG.CFG49.CFG49.SERIAL_NUMBER_LOW = config->SERIAL_NUMBER & 0xFF;
+  pcap_nvram.CFG.CFG50.CFG50.SERIAL_NUMBER_HIGH = (config->SERIAL_NUMBER >> 8) & 0xFF;
 
-  pcap_nvram.CFG.CFG54.CFG54.MEM_CTRL = pcap_config->MEM_CTRL;
+  pcap_nvram.CFG.CFG54.CFG54.MEM_CTRL = config->MEM_CTRL;
 
   writeall_config();
 
@@ -1299,68 +1391,67 @@ void PCAP04::write_nvram(unsigned short addr){
 
 pcap_results_t* PCAP04::get_results(){
   // Serial.println("get_results start");
-  
-  static unsigned int decimal_part = 0;
-  static float decimal_part_f = 0;
-  static unsigned int integer_part = 0;
-
   readall_result();
+  
 
-  if (pcap_measurement_mode == STANDARD){
+  // if (pcap_measurement_mode == STANDARD){
 
-    // Serial.println((unsigned int)pcap_results_regs.RES0.REGVAL, HEX);
-    // Serial.println((unsigned int)pcap_results_regs.RES0.REGVAL, BIN);
-    // Serial.println((unsigned int)(pcap_results_regs.RES0.REGVAL >> 27),BIN);
-    // Serial.println((unsigned int)(pcap_results_regs.RES0.REGVAL & 0x07FFFFFF),BIN);
-    // Serial.println((unsigned int)(pcap_results_regs.RES0.REGVAL & 0x07FFFFFF));
-    decimal_part = pcap_results_regs.RES0.REGVAL & 0x07FFFFFF;
-    integer_part = pcap_results_regs.RES0.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
-    pcap_results.C0_over_CREF = integer_part  + decimal_part_f;
+  //   // Serial.println((unsigned int)pcap_results_regs.RES0.REGVAL, HEX);
+  //   // Serial.println((unsigned int)pcap_results_regs.RES0.REGVAL, BIN);
+  //   // Serial.println((unsigned int)(pcap_results_regs.RES0.REGVAL >> 27),BIN);
+  //   // Serial.println((unsigned int)(pcap_results_regs.RES0.REGVAL & 0x07FFFFFF),BIN);
+  //   // Serial.println((unsigned int)(pcap_results_regs.RES0.REGVAL & 0x07FFFFFF));
+  //   decimal_part = pcap_results_regs.RES0.REGVAL & 0x07FFFFFF;
+  //   integer_part = pcap_results_regs.RES0.REGVAL >> 27;
+  //   decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
+  //   // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+  //   pcap_results.CREF_over_CInternalREF = integer_part  + decimal_part_f;
 
-    decimal_part = pcap_results_regs.RES1.REGVAL & 0x07FFFFFF;
-    integer_part = pcap_results_regs.RES1.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
-    pcap_results.C1_over_CREF = integer_part + decimal_part_f;
+  //   decimal_part = pcap_results_regs.RES1.REGVAL & 0x07FFFFFF;
+  //   integer_part = pcap_results_regs.RES1.REGVAL >> 27;
+  //   decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
+  //   // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+  //   pcap_results.C1_over_CREF = integer_part + decimal_part_f;
 
-    decimal_part = pcap_results_regs.RES2.REGVAL & 0x07FFFFFF;
-    integer_part = pcap_results_regs.RES2.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
-    pcap_results.C2_over_CREF = integer_part + decimal_part_f;
+  //   decimal_part = pcap_results_regs.RES2.REGVAL & 0x07FFFFFF;
+  //   integer_part = pcap_results_regs.RES2.REGVAL >> 27;
+  //   decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
+  //   // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+  //   pcap_results.C2_over_CREF = integer_part + decimal_part_f;
 
-    decimal_part = pcap_results_regs.RES3.REGVAL & 0x07FFFFFF;
-    integer_part = pcap_results_regs.RES3.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
-    pcap_results.C3_over_CREF = integer_part + decimal_part_f;
+  //   decimal_part = pcap_results_regs.RES3.REGVAL & 0x07FFFFFF;
+  //   integer_part = pcap_results_regs.RES3.REGVAL >> 27;
+  //   decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
+  //   // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+  //   pcap_results.C3_over_CREF = integer_part + decimal_part_f;
 
-    decimal_part = pcap_results_regs.RES4.REGVAL & 0x07FFFFFF;
-    integer_part = pcap_results_regs.RES4.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
-    pcap_results.C4_over_CREF = integer_part + decimal_part_f;
+  //   decimal_part = pcap_results_regs.RES4.REGVAL & 0x07FFFFFF;
+  //   integer_part = pcap_results_regs.RES4.REGVAL >> 27;
+  //   decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
+  //   // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+  //   pcap_results.C4_over_CREF = integer_part + decimal_part_f;
 
-    decimal_part = pcap_results_regs.RES5.REGVAL & 0x07FFFFFF;
-    integer_part = pcap_results_regs.RES5.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
-    pcap_results.C5_over_CREF = integer_part + decimal_part_f;
+  //   decimal_part = pcap_results_regs.RES5.REGVAL & 0x07FFFFFF;
+  //   integer_part = pcap_results_regs.RES5.REGVAL >> 27;
+  //   decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
+  //   // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+  //   pcap_results.C5_over_CREF = integer_part + decimal_part_f;
 
-    decimal_part = pcap_results_regs.RES6.REGVAL & 0x07FFFFFF;
-    integer_part = pcap_results_regs.RES6.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
-    pcap_results.PT1_over_PTREF = integer_part + decimal_part_f;
+  //   decimal_part = pcap_results_regs.RES6.REGVAL & 0x07FFFFFF;
+  //   integer_part = pcap_results_regs.RES6.REGVAL >> 27;
+  //   decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
+  //   // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+  //   pcap_results.PT1_over_PTREF = integer_part + decimal_part_f;
 
-    decimal_part = pcap_results_regs.RES7.REGVAL & 0x07FFFFFF;
-    integer_part = pcap_results_regs.RES7.REGVAL >> 27;
-    decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
-    // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
-    pcap_results.PTInternal_over_PTREF = integer_part + decimal_part_f;
-  }
+  //   decimal_part = pcap_results_regs.RES7.REGVAL & 0x07FFFFFF;
+  //   integer_part = pcap_results_regs.RES7.REGVAL >> 27;
+  //   decimal_part_f =  (float)(decimal_part/134217727.0f)*0.9999995f;
+  //   // Serial.print(integer_part); Serial.print(" - "); Serial.print(decimal_part); Serial.print(" - ");  Serial.print(decimal_part_f,7); Serial.print(" - ");
+  //   pcap_results.PTInternal_over_PTREF = integer_part + decimal_part_f;
+  
+  // }
+
+  convert_results_regs_to_float();
 
   return &pcap_results;
   
@@ -1372,25 +1463,7 @@ pcap_status_t* PCAP04::get_status(bool print_status){
 
   readall_status();
   
-  pcap_status.RUNBIT =  pcap_results_regs.STATUS0.STATUS0.RUNBIT;
-  pcap_status.CDC_ACTIVE =  pcap_results_regs.STATUS0.STATUS0.CDC_ACTIVE;
-  pcap_status.RDC_READY =  pcap_results_regs.STATUS0.STATUS0.RDC_READY;
-  pcap_status.AUTOBOOT_BUSY = pcap_results_regs.STATUS0.STATUS0.AUTOBOOT_BUSY;
-  pcap_status.POR_CDC_DSP_COLL =  pcap_results_regs.STATUS0.STATUS0.POR_CDC_DSP_COLL;
-  pcap_status.POR_FLAG_WDOG = pcap_results_regs.STATUS0.STATUS0.POR_FLAG_WDOG;
-
-  pcap_status.COMB_ERR = pcap_results_regs.STATUS1.STATUS1.COMB_ERR;
-  pcap_status.ERR_OVERFL = pcap_results_regs.STATUS1.STATUS1.ERR_OVFL;
-  pcap_status.MUP_ERR = pcap_results_regs.STATUS1.STATUS1.MUP_ERR;
-  pcap_status.RDC_ERR = pcap_results_regs.STATUS1.STATUS1.RDC_ERR;
-
-  pcap_status.C_PORT_ERR0 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR0;
-  pcap_status.C_PORT_ERR1 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR1;
-  pcap_status.C_PORT_ERR2 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR2;
-  pcap_status.C_PORT_ERR3 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR3;
-  pcap_status.C_PORT_ERR4 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR4;
-  pcap_status.C_PORT_ERR5 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR5;
-  pcap_status.C_PORT_ERR_INT = pcap_results_regs.STATUS2.STATUS2.C_PORTERR_INT;
+  convert_status_regs_to_flags();
 
   if (print_status){
     Serial.print(pcap_results_regs.STATUS0.REGVAL, BIN);Serial.print(" ");
