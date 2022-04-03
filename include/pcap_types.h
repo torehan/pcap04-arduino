@@ -255,7 +255,11 @@ struct pcap_config_t
 #ifdef PCAP_MEASUREMENT_MODE_STANDARD
 struct pcap_results_t
 {
+#ifdef PCAP_REFERENCE_CAP_EXTERNAL
+    float CREF_over_CInternalREF;
+#else
     float C0_over_CREF;
+#endif
     float C1_over_CREF;
     float C2_over_CREF;
     float C3_over_CREF;
@@ -263,14 +267,28 @@ struct pcap_results_t
     float C5_over_CREF;
     float PT1_over_PTREF;
     float PTInternal_over_PTREF;
-};
-#endif 
+}pcap_results_packed;
+#endif
+#ifdef PCAP_MEASUREMENT_MODE_STANDARD_FLOATING
+struct pcap_results_t
+{
+#ifdef PCAP_REFERENCE_CAP_EXTERNAL
+    float CREF_over_CInternalREF;
+#else
+    float C0_over_CREF;
+#endif
+    float C1_over_CREF;
+    float C2_over_CREF;
+    float PT1_over_PTREF;
+    float PTInternal_over_PTREF;
+}pcap_results_packed;
+#endif  
 #ifdef PCAP_MEASUREMENT_MODE_STANDARD_DIFFERENTIAL
 struct pcap_results_t
 {
     float C1_over_C0;
     float C3_over_C2;
-    float C5_over_C4;
+    float C5_over_C6;
     float PT1_over_PTREF;
     float PTInternal_over_PTREF;
 };
@@ -286,7 +304,7 @@ struct pcap_results_t
     float Yi_out;
     float Pulse_Z;
     float Pulse_T;
-};
+}pcap_results_packed;
 #endif  
 #ifdef PCAP_MEASUREMENT_MODE_PRESSURE
 struct pcap_results_t
@@ -299,7 +317,7 @@ struct pcap_results_t
     float Yi_out;
     float Pulse_Z;
     float Pulse_T;
-};
+}pcap_results_packed;
 #endif
 
 struct pcap_status_t
