@@ -1,10 +1,14 @@
 #ifndef pcap_defines_h
 #define pcap_defines_h
 
-#define PCAP_MEASUREMENT_MODE_STANDARD
+// #define PCAP_MEASUREMENT_MODE_STANDARD
+// #define PCAP_MEASUREMENT_MODE_STANDARD_FLOATING
 // #define PCAP_MEASUREMENT_MODE_STANDARD_DIFFERENTIAL
-// #define PCAP_MEASUREMENT_MODE_HUMIDITY
+#define PCAP_MEASUREMENT_MODE_HUMIDITY
 // #define PCAP_MEASUREMENT_MODE_PRESSURE
+
+#define PCAP_REFERENCE_CAP_EXTERNAL
+// #define PCAP_REFERENCE_CAP_INTERNAL
 
 #define WR_NVRAM 0x28       // 'b:10 1000
 #define RD_NVRAM 0x08       // 'b:00 1000
@@ -37,7 +41,11 @@
     (i > 0 ? (int) log10 ((double) i) + 1 : 1)
 #endif
 
-#define PCAP_RESULTS_SIZE 35
+
+#define PCAP_RESULT_REG_SIZE 4              // Each result register contains 4 bytes. 
+
+#define PCAP_RESULTS_SIZE 32
+#define PCAP_STATUS_SIZE 3
 
 #define PCAP_NVRAM_RUNBIT_INDEX 1007
 
