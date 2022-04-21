@@ -320,7 +320,9 @@ void PCAP04::start_sampling(pcap_config_t* config){
   
   config->RUNBIT = 1;
 
-  write_config(47, config->RUNBIT);
+  update_config(config);
+  
+  //write_config(47, config->RUNBIT);
 
 }
 
@@ -328,7 +330,9 @@ void PCAP04::stop_sampling(pcap_config_t* config){
   
   config->RUNBIT = 0;
 
-  write_config(47, config->RUNBIT);
+  update_config(config);
+
+  //write_config(47, config->RUNBIT);
 
 }
 
@@ -851,25 +855,25 @@ void PCAP04::read_result(unsigned char addr)
   // Serial.println("read_result end");
 }
 void PCAP04::convert_status_regs_to_flags(){
-  pcap_status.RUNBIT =  pcap_results_regs.STATUS0.STATUS0.RUNBIT;
-  pcap_status.CDC_ACTIVE =  pcap_results_regs.STATUS0.STATUS0.CDC_ACTIVE;
-  pcap_status.RDC_READY =  pcap_results_regs.STATUS0.STATUS0.RDC_READY;
-  pcap_status.AUTOBOOT_BUSY = pcap_results_regs.STATUS0.STATUS0.AUTOBOOT_BUSY;
-  pcap_status.POR_CDC_DSP_COLL =  pcap_results_regs.STATUS0.STATUS0.POR_CDC_DSP_COLL;
-  pcap_status.POR_FLAG_WDOG = pcap_results_regs.STATUS0.STATUS0.POR_FLAG_WDOG;
+  pcap_status.RUNBIT =  (bool)pcap_results_regs.STATUS0.STATUS0.RUNBIT;
+  pcap_status.CDC_ACTIVE =  (bool)pcap_results_regs.STATUS0.STATUS0.CDC_ACTIVE;
+  pcap_status.RDC_READY =  (bool)pcap_results_regs.STATUS0.STATUS0.RDC_READY;
+  pcap_status.AUTOBOOT_BUSY = (bool)pcap_results_regs.STATUS0.STATUS0.AUTOBOOT_BUSY;
+  pcap_status.POR_CDC_DSP_COLL =  (bool)pcap_results_regs.STATUS0.STATUS0.POR_CDC_DSP_COLL;
+  pcap_status.POR_FLAG_WDOG = (bool)pcap_results_regs.STATUS0.STATUS0.POR_FLAG_WDOG;
 
-  pcap_status.COMB_ERR = pcap_results_regs.STATUS1.STATUS1.COMB_ERR;
-  pcap_status.ERR_OVERFL = pcap_results_regs.STATUS1.STATUS1.ERR_OVFL;
-  pcap_status.MUP_ERR = pcap_results_regs.STATUS1.STATUS1.MUP_ERR;
-  pcap_status.RDC_ERR = pcap_results_regs.STATUS1.STATUS1.RDC_ERR;
+  pcap_status.COMB_ERR = (bool)pcap_results_regs.STATUS1.STATUS1.COMB_ERR;
+  pcap_status.ERR_OVERFL = (bool)pcap_results_regs.STATUS1.STATUS1.ERR_OVFL;
+  pcap_status.MUP_ERR = (bool)pcap_results_regs.STATUS1.STATUS1.MUP_ERR;
+  pcap_status.RDC_ERR = (bool)pcap_results_regs.STATUS1.STATUS1.RDC_ERR;
 
-  pcap_status.C_PORT_ERR0 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR0;
-  pcap_status.C_PORT_ERR1 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR1;
-  pcap_status.C_PORT_ERR2 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR2;
-  pcap_status.C_PORT_ERR3 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR3;
-  pcap_status.C_PORT_ERR4 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR4;
-  pcap_status.C_PORT_ERR5 = pcap_results_regs.STATUS2.STATUS2.C_PORTERR5;
-  pcap_status.C_PORT_ERR_INT = pcap_results_regs.STATUS2.STATUS2.C_PORTERR_INT;
+  pcap_status.C_PORT_ERR0 = (bool)pcap_results_regs.STATUS2.STATUS2.C_PORTERR0;
+  pcap_status.C_PORT_ERR1 = (bool)pcap_results_regs.STATUS2.STATUS2.C_PORTERR1;
+  pcap_status.C_PORT_ERR2 = (bool)pcap_results_regs.STATUS2.STATUS2.C_PORTERR2;
+  pcap_status.C_PORT_ERR3 = (bool)pcap_results_regs.STATUS2.STATUS2.C_PORTERR3;
+  pcap_status.C_PORT_ERR4 = (bool)pcap_results_regs.STATUS2.STATUS2.C_PORTERR4;
+  pcap_status.C_PORT_ERR5 = (bool)pcap_results_regs.STATUS2.STATUS2.C_PORTERR5;
+  pcap_status.C_PORT_ERR_INT = (bool)pcap_results_regs.STATUS2.STATUS2.C_PORTERR_INT;
 }
 
 void PCAP04::convert_results_regs_to_float(){
